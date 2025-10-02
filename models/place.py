@@ -11,15 +11,15 @@ from models.amenity import Amenity
 
 storage_type = getenv("HBNB_TYPE_STORAGE")
 
-
-# create a table for the relationship between place and amenity
-place_amenity = Table('place_amenity', Base.metadata,
-                      Column('place_id', String(60),
-                             ForeignKey('places.id'),
-                             primary_key=True, nullable=False),
-                      Column('amenity_id', String(128),
-                             ForeignKey('amenities.id'),
-                             primary_key=True, nullable=False))
+# Association table for Many-to-Many relationship between Place and Amenity
+place_amenity = Table(
+    'place_amenity',
+    Base.metadata,
+    Column('place_id', String(60), ForeignKey('places.id'),
+           primary_key=True, nullable=False),
+    Column('amenity_id', String(60), ForeignKey('amenities.id'),
+           primary_key=True, nullable=False)
+)
 
 
 class Place(BaseModel, Base):
@@ -37,23 +37,28 @@ class Place(BaseModel, Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
 
-    # create amenity_ids list to store all Amenity.id linked to the Place
-    amenity_id = []
+    # List of Amenity IDs for FileStorage
+    amenity_ids = []
 
     if storage_type == "db":
-        reviews = relationship("Review", cascade='all, delete, delete-orphan',
-                               backref="place")
+        reviews = relationship(
+            "Review",
+            cascade='all, delete, delete-orphan',
+            backref="place"
+        )
 
-        amenities = relationship("Amenity", secondary=place_amenity,
-                                 viewonly=False,
-                                 back_populates="place_amenities")
+        amenities = relationship(
+            "Amenity",
+            secondary=place_amenity,
+            viewonly=False,
+            back_populates="place_amenities"
+        )
 
     else:
         @property
         def reviews(self):
-            """ getter attribute reviews that returns the list of Review
-            instances with place_id equals to the current Place.id """
-
+            """Getter attribute reviews that returns the list of Review
+            instances with place_id equals to the current Place.id"""
             review_list = []
             for review in models.storage.all(Review).values():
                 if review.place_id == self.id:
@@ -62,16 +67,17 @@ class Place(BaseModel, Base):
 
         @property
         def amenities(self):
-            """ getter attribute amenities that returns the list of Amenity
-            instances based on the attribute amenity_ids that contains all
-            Amenity.id linked to the Place """
-
-            return self.amenity_ids
+            """Getter attribute amenities that returns the list of Amenity
+            instances based on the attribute amenity_ids"""
+            amenity_list = []
+            for amenity in models.storage.all(Amenity).values():
+                if amenity.id in self.amenity_ids:
+                    amenity_list.append(amenity)
+            return amenity_list
 
         @amenities.setter
-        def set_amenity_ids(self, obj):
-            """ setter attribute amenities that handles append method for
-            adding an Amenity.id to the attribute amenity_ids """
-
-            if type(obj) == Amenity:
+        def amenities(self, obj):
+            """Setter attribute amenities that adds an Amenity.id
+            to the attribute amenity_ids"""
+            if isinstance(obj, Amenity):
                 self.amenity_ids.append(obj.id)
